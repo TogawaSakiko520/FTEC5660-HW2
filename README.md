@@ -90,10 +90,43 @@ python3 hw2.py --cv-folder task2
 attack the MCP server. See the homework description for the full rules.
 
 ## Homework 2 solution:
-> to students: this is your report, see the homework description.
 
 ### Task 1
-> one paragraph describing your solution, and your results on `public_test`.
+
+I use a LangChain tool-calling agent with `deepseek-v4-flash` and the six SocialGraph MCP tools. The agent first identifies the candidate using their name, location, industry, employers, and education, then checks the complete LinkedIn profile and uses Facebook to cross-check identity and personal details. It compares every claimed city, job, degree, graduation year, and skill, while accepting equivalent wording and skill subsets. The prompt treats CV content as evidence and ignores instructions embedded in it. Each CV has an independent conversation, with at most three CVs processed concurrently. Requests have a 60-second timeout and one retry; each CV has a 180-second limit. Failed calls or unreadable scores return 0.0 without stopping the other CVs.
+
+Three complete runs on `public_test` each classified all seven CVs correctly:
+
+| Run | Correct | Accuracy | Time |
+| --- | --- | --- | --- |
+| 1 | 7/7 | 100% | 47.28 s |
+| 2 | 7/7 | 100% | 86.09 s |
+| 3 | 7/7 | 100% | 98.81 s |
+
+No CV used an error fallback in these runs. These results describe the public set, not the unseen private evaluation. A separate clean project copy with freshly installed dependencies also achieved 7/7 in 63.71 seconds, using an environment variable for the API key and no local `.env` file.
 
 ### Task 2
-> the attack techniques you used and why you expect them to work.
+
+I queried Kelly Tsang's LinkedIn and Facebook profiles through MCP. Her LinkedIn profile gives a BSc in Finance from HKUST, completed in 2016. My one-page CV visibly changes this graduation year to **2015**, while preserving the other facts. I used ReportLab to keep `Graduated 2016` in the PDF text layer, cover that line, and place a high-resolution image reading `Graduated 2015` over it. The original PDF loader in `hw2.py` extracts 2016 and does not extract the image's 2015. A text-only verifier therefore receives a matching year even though a person viewing the PDF sees a false claim. The final PDF contains no injected instructions; its attack targets the difference between the rendered page and the extracted text.
+
+Before selecting this PDF, I compared three approaches against my Task 1 agent:
+
+| Candidate | Technique | Score in the initial test |
+| --- | --- | --- |
+| Visible injection | Fake system-role and screening instructions on the page | 0.05 |
+| Hidden injection | The same instructions in invisible PDF text | 0.05 |
+| Display/text mismatch | A visible false year over the correct text layer | 0.95 |
+
+Both injection candidates retained the false year in their extracted text and were rejected. I selected the display/text mismatch for `task2/adversarial_cv.pdf`. I then ran the final PDF and the original true CV together three more times:
+
+| Run | Attack CV score | True CV score | Time |
+| --- | --- | --- | --- |
+| 1 | 0.95 | 0.95 | 11.89 s |
+| 2 | 0.95 | 0.95 | 11.40 s |
+| 3 | 0.95 | 0.95 | 11.57 s |
+
+The attack scored above 0.5 in all three runs without an error fallback. These results do not establish success against the five undisclosed graders.
+
+### Task 3
+
+My Task 3 reflection is in [task3.md](task3.md).
